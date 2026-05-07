@@ -1,0 +1,7 @@
+.vscode/**
+src/**
+tsconfig.json
+package-lock.json
+Copy_Result.json
+Real_Result.json
+*.vsix
