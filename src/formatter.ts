@@ -6,9 +6,10 @@ import { VariableNode } from './types';
 export function buildObjectTree(node: VariableNode, depth: number = 0): any {
   const nodeType = (node.type || '').toLowerCase();
   const isDateType = nodeType.includes('datetime') || nodeType.includes('date');
+  const hasChildren = node.children && node.children.length > 0;
 
   // 1. Xử lý các giá trị cơ bản (Primitives) hoặc kiểu Date
-  if (node.variablesReference === 0 || depth > 30 || isDateType) {
+  if ((node.variablesReference === 0 && !hasChildren) || depth > 30 || isDateType) {
     let val = node.value;
     
     // Làm sạch chuỗi ngày tháng nếu cần
@@ -21,7 +22,14 @@ export function buildObjectTree(node: VariableNode, depth: number = 0): any {
     if (val === 'null') return null;
     if (val === 'true') return true;
     if (val === 'false') return false;
-    if (!isNaN(Number(val)) && val.trim() !== '') return Number(val);
+    
+    // Ép kiểu số
+    const isNumericType = ['number', 'int', 'double', 'decimal', 'float', 'long', 'short', 'byte'].some(t => nodeType.includes(t));
+    if (isNumericType && val !== null && !isNaN(Number(val)) && val.trim() !== '') {
+        if (!val.includes('.') || !val.endsWith('.0')) {
+            return Number(val);
+        }
+    }
     
     // Xử lý chuỗi được bao bởi dấu ngoặc kép
     if (typeof val === 'string' && val.startsWith('"') && val.endsWith('"')) {
@@ -88,7 +96,9 @@ export function buildObjectTree(node: VariableNode, depth: number = 0): any {
  * Hàm định dạng cây biến thành chuỗi text (JSON hoặc Plain Text)
  */
 export function formatVariable(node: VariableNode, format: 'json' | 'plain' = 'json'): string {
-  if (node.variablesReference === 0) {
+  const hasChildren = node.children && node.children.length > 0;
+  
+  if (node.variablesReference === 0 && !hasChildren) {
     return format === 'json' ? JSON.stringify(node.value) : String(node.value);
   }
 

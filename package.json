@@ -3,12 +3,33 @@
   "displayName": "Copy Debug Variable",
   "description": "Copy variable values during debugging sessions with support for all data types",
   "version": "1.0.0",
+  "icon": "extension_logo.png",
   "publisher": "doquochao95",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/doquochao95/Copy-Debug-Variable.git"
+  },
   "engines": {
     "vscode": "^1.80.0"
   },
-  "categories": ["Debuggers"],
-  "activationEvents": ["onDebug"],
+  "categories": [
+    "Debuggers",
+    "Other"
+  ],
+  "keywords": [
+    "debug",
+    "copy",
+    "json",
+    "variable",
+    ".net",
+    "csharp",
+    "typescript",
+    "javascript"
+  ],
+  "activationEvents": [
+    "onDebug"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [{

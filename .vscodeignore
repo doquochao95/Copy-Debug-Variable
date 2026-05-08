@@ -1,7 +1,12 @@
 .vscode/**
+.git/**
+.gitignore
 src/**
+node_modules/**
+out/*.map
 tsconfig.json
 package-lock.json
 Copy_Result.json
 Real_Result.json
 *.vsix
+

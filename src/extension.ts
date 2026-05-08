@@ -68,38 +68,30 @@ export function activate(context: vscode.ExtensionContext) {
 
       let valueToCopy: string = '';
 
-      await vscode.window.withProgress({
-        location: vscode.ProgressLocation.Notification,
-        title: `Đang xử lý dữ liệu biến "${varName}"...`,
-        cancellable: false
-      }, async (progress) => {
-        const lowerType = actualType.toLowerCase();
-        const isDateType = lowerType.includes('datetime') || lowerType.includes('date');
+      const lowerType = actualType.toLowerCase();
+      const isDateType = lowerType.includes('datetime') || lowerType.includes('date');
 
-        // 2. Xử lý giá trị đơn giản hoặc kiểu Date
-        if (variablesRef === 0 || isDateType) {
-          valueToCopy = format === 'json' ? JSON.stringify(varValue) : String(varValue);
-        } 
-        // 3. Xử lý các đối tượng phức tạp (List, Dictionary, Object...)
-        else {
-          // Lấy toàn bộ cây dữ liệu (sử dụng chữ ký hàm mới đã được bạn refactor)
-          const children = await fetchVariableTree(
-              session, 
-              variablesRef, 
-              varValue, 
-              0
-          );
-          
-          const node = {
-            name: varName,
-            value: varValue,
-            type: targetVariable.type,
-            variablesReference: variablesRef,
-            children
-          };
-          valueToCopy = formatVariable(node, format);
-        }
-      });
+      // 2. Xử lý giá trị đơn giản hoặc kiểu Date
+      if (variablesRef === 0 || isDateType) {
+        valueToCopy = format === 'json' ? JSON.stringify(varValue) : String(varValue);
+      } 
+      // 3. Xử lý các đối tượng phức tạp (List, Dictionary, Object...)
+      else {
+        // Lấy toàn bộ cây dữ liệu
+        const children = await fetchVariableTree(
+            session, 
+            targetVariable.evaluateName || varName
+        );
+        
+        const node = {
+          name: varName,
+          value: varValue,
+          type: targetVariable.type,
+          variablesReference: variablesRef,
+          children
+        };
+        valueToCopy = formatVariable(node, format);
+      }
 
       // 4. Lưu vào clipboard
       if (valueToCopy) {

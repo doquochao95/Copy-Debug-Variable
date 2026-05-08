@@ -6,90 +6,134 @@ import { VariableNode } from './types';
  */
 export async function fetchVariableTree(
   session: vscode.DebugSession,
-  variablesReference: number,
-  initialValue?: string,
-  depth: number = 0,
+  evaluateName: string
 ): Promise<VariableNode[]> {
-  // Giới hạn độ sâu để tránh đệ quy vô tận hoặc treo máy
-  if (variablesReference === 0 || depth > 20) {
-    return [];
-  }
-
-  /**
-   * Helper: Xử lý các nút "[More]" do .NET Debugger tự động chèn vào khi dữ liệu quá lớn (pagination)
-   */
-  async function expandMoreNodes(vars: any[]): Promise<any[]> {
-    let result = [...vars];
-    while (true) {
-      const moreIndex = result.findIndex(v => v.name === '[More]');
-      if (moreIndex === -1) break;
-
-      const moreVar = result[moreIndex];
-      result.splice(moreIndex, 1); // Loại bỏ nút [More] để thay bằng dữ liệu thật
-
-      if (moreVar.variablesReference > 0) {
-        try {
-          const moreResp = await session.customRequest('variables', {
-            variablesReference: moreVar.variablesReference,
-            count: 10000
-          });
-          const newVars = moreResp.variables || [];
-          result.push(...newVars);
-        } catch (e) {
-          break;
-        }
-      } else {
-        break;
+  try {
+    const jsonStr = await tryFetchAsJson(session, evaluateName);
+    if (jsonStr) {
+      const data = JSON.parse(jsonStr);
+      if (data !== null) {
+        return convertJsonToNodes(data);
       }
     }
-    return result;
+
+    throw "Không thể Serialize đối tượng sang JSON.";
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * Thử Serialize đối tượng sang JSON
+ */
+async function tryFetchAsJson(session: vscode.DebugSession, expr: string): Promise<string | null> {
+  const isJS = ['node', 'pwa-node', 'pwa-chrome', 'pwa-msedge', 'extensionHost'].includes(session.type);
+  let expressions: string[] = [];
+  if (isJS) {
+    // Javascript/Typescript
+    expressions = [
+      `JSON.stringify(${expr})`,
+      `(function(obj){
+          const cache = new Set();
+          return JSON.stringify(obj, (key, value) => {
+            if (typeof value === 'object' && value !== null) {
+              if (cache.has(value)) return;
+              cache.add(value);
+            }
+            return typeof value === 'bigint' ? value.toString() : value;
+          });
+        })(${expr})`
+    ];
+  } else {
+    // .NET (C#)
+    expressions = [
+      `Newtonsoft.Json.JsonConvert.SerializeObject(${expr}, new Newtonsoft.Json.JsonSerializerSettings { 
+        MaxDepth = 3,
+        ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore,
+        Error = (s, e) => e.ErrorContext.Handled = true }
+      )`,
+      `System.Text.Json.JsonSerializer.Serialize(${expr})`
+    ];
   }
 
   try {
-    // 1. Lấy thông tin số lượng phần tử (nếu có) từ giá trị hiển thị (vd: Count = 42)
-    let totalCount = 0;
-    if (initialValue && typeof initialValue === 'string') {
-      let match = initialValue.match(/Count\s*=\s*(\d+)/i) || initialValue.match(/\[(\d+)\]/);
-      if (match && match[1]) {
-        totalCount = parseInt(match[1], 10);
+    const threadsResp = await session.customRequest('threads');
+    const threads = threadsResp.threads || [];
+
+    // Thử trên nhiều Frame thay vì chỉ Frame đầu tiên
+    for (const thread of threads) {
+      const stackResp = await session.customRequest('stackTrace', { threadId: thread.id, levels: 5 });
+      const frames = stackResp.stackFrames || [];
+
+      for (const frame of frames) {
+        for (const testExpr of expressions) {
+          try {
+            const evalResp: any = await session.customRequest('evaluate', {
+              expression: testExpr,
+              frameId: frame.id,
+              context: 'repl'
+            });
+
+            if (evalResp && evalResp.result) {
+              let result = evalResp.result;
+
+              // GIẢI MÃ CHUỖI (Unescape): Debugger trả về string literal
+              const isQuoted = (result.startsWith('"') && result.endsWith('"')) || (result.startsWith("'") && result.endsWith("'"));
+              if (isQuoted) {
+                try {
+                  const normalizedResult = result.startsWith("'") 
+                    ? '"' + result.substring(1, result.length - 1).replace(/\\'/g, "'").replace(/"/g, '\\"') + '"'
+                    : result;
+                  result = JSON.parse(normalizedResult);
+                } catch (e) {
+                  // Fallback nếu parse lỗi
+                  result = result.substring(1, result.length - 1).replace(/\\"/g, '"').replace(/\\'/g, "'");
+                }
+              }
+
+              // Nếu kết quả chứa lỗi đặc trưng của debugger, bỏ qua
+              if (result.includes("Evaluation failed") || result.includes("error CS")) continue;
+
+              // Kiểm tra xem chuỗi có phải JSON hợp lệ không
+              if (result.trim().startsWith('{') || result.trim().startsWith('[')) {
+                return result;
+              }
+            }
+          } catch (e) { }
+        }
       }
     }
+  } catch (e) { }
 
-    // 2. Lấy danh sách biến ban đầu
-    const resp = await session.customRequest('variables', {
-      variablesReference,
-      start: 0,
-      count: 1000
-    });
-    let firstBatch: any[] = resp.variables || [];
+  return null;
+}
 
-    // Mở rộng tất cả các nút [More] nếu có
-    firstBatch = await expandMoreNodes(firstBatch);
-
-    // 3. Xây dựng cây VariableNode đệ quy
-    const allNodes: VariableNode[] = [];
-    for (const variable of firstBatch) {
-      const isRawView = variable.name === 'Raw View' || variable.name === 'Results View';
-      if (isRawView) continue;
-
-      const varType = (variable.type || '').toLowerCase();
-      const isDateType = varType.includes('datetime') || varType.includes('date');
-
-      const node: VariableNode = {
-        name: variable.name,
-        value: variable.value,
-        type: variable.type,
-        variablesReference: (isDateType) ? 0 : (variable.variablesReference || 0)
+/**
+ * Chuyển đổi dữ liệu JSON thô thành cây VariableNode
+ */
+function convertJsonToNodes(obj: any): VariableNode[] {
+  if (Array.isArray(obj)) {
+    return obj.map((item, index) => {
+      const isComplex = item !== null && typeof item === 'object';
+      return {
+        name: `[${index}]`,
+        value: isComplex ? '' : String(item),
+        type: typeof item,
+        variablesReference: 0,
+        children: isComplex ? convertJsonToNodes(item) : []
       };
-
-      if (node.variablesReference > 0) {
-        node.children = await fetchVariableTree(session, node.variablesReference, undefined, depth + 1);
-      }
-      allNodes.push(node);
-    }
-
-    return allNodes;
-  } catch (error) {
-    return [];
+    });
+  } else if (typeof obj === 'object' && obj !== null) {
+    return Object.entries(obj).map(([key, value]) => {
+      const isComplex = value !== null && typeof value === 'object';
+      return {
+        name: key,
+        value: isComplex ? '' : String(value),
+        type: typeof value,
+        variablesReference: 0,
+        children: isComplex ? convertJsonToNodes(value) : []
+      };
+    });
   }
+  return [];
 }
