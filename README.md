@@ -1,6 +1,6 @@
 # Copy Debug Variable 🚀
 
-A powerful VS Code extension that allows you to copy debugger variable data quickly, accurately, and without element limits.
+A powerful VS Code extension that allows you to copy and compare debugger variables quickly, accurately, and without element limits.
 
 ## Why use this extension?
 
@@ -18,6 +18,7 @@ By default, when copying large arrays or objects in the VS Code Debugger, you of
 - 💎 **Original Data Integrity**: Preserves decimal formatting (e.g., `2.0`), supports Unicode (Vietnamese, Chinese, etc.), and handles special types.
 - 🛠 **Smart Handling**: Automatically manages circular references to prevent debugger crashes.
 - 📋 **Flexible Formats**: Supports copying as **JSON** or **Plain Text**.
+- 🔍 **Smart Comparison (Diff View)**: Compare two variables or two different states of the same variable using VS Code's native diff editor.
 
 ### Format Details:
 
@@ -34,9 +35,15 @@ By default, when copying large arrays or objects in the VS Code Debugger, you of
 
 ## How to Use
 
+### Basic Copying
 1. While debugging, right-click on any variable in the **Variables** view.
-2. Select **Copy Variable Value** (for JSON) or **Copy Variable Value (Plain Text)**.
+2. Select **Copy Variable Value**.
 3. The data is now ready in your clipboard!
+
+### Smart Comparison
+1. Right-click on **Variable A** and select **Select for Compare**.
+2. Right-click on **Variable B** and select **Compare with Selected**.
+3. VS Code will open a side-by-side diff view showing the structural differences.
 
 ## Requirements
 

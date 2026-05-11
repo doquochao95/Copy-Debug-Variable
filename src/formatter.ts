@@ -11,7 +11,7 @@ export function buildObjectTree(node: VariableNode, depth: number = 0): any {
   // 1. Xử lý các giá trị cơ bản (Primitives) hoặc kiểu Date
   if ((node.variablesReference === 0 && !hasChildren) || depth > 30 || isDateType) {
     let val = node.value;
-    
+
     // Làm sạch chuỗi ngày tháng nếu cần
     if (isDateType && typeof val === 'string') {
       return val.replace(/^\{|\}$|^"|"$/g, '');
@@ -22,15 +22,15 @@ export function buildObjectTree(node: VariableNode, depth: number = 0): any {
     if (val === 'null') return null;
     if (val === 'true') return true;
     if (val === 'false') return false;
-    
+
     // Ép kiểu số
     const isNumericType = ['number', 'int', 'double', 'decimal', 'float', 'long', 'short', 'byte'].some(t => nodeType.includes(t));
     if (isNumericType && val !== null && !isNaN(Number(val)) && val.trim() !== '') {
-        if (!val.includes('.') || !val.endsWith('.0')) {
-            return Number(val);
-        }
+      if (!val.includes('.') || !val.endsWith('.0')) {
+        return Number(val);
+      }
     }
-    
+
     // Xử lý chuỗi được bao bởi dấu ngoặc kép
     if (typeof val === 'string' && val.startsWith('"') && val.endsWith('"')) {
       try {
@@ -58,7 +58,7 @@ export function buildObjectTree(node: VariableNode, depth: number = 0): any {
 
       for (const child of filtered) {
         const childResult = buildObjectTree(child, depth + 1);
-        
+
         // Un-wrap nếu dữ liệu bị bọc trong một đối tượng rỗng (lỗi biên của vsdbg)
         if (typeof childResult === 'object' && childResult !== null && !Array.isArray(childResult)) {
           const keys = Object.keys(childResult);
@@ -82,10 +82,10 @@ export function buildObjectTree(node: VariableNode, depth: number = 0): any {
       let propName = child.name || '';
       // Loại bỏ phần [index] ở cuối tên nếu có (đối với một số debugger đặc thù)
       propName = propName.replace(/\s*\[.*?\]\s*$/, '');
-      
+
       const isInternal = propName === 'Capacity' || propName === 'Count' || propName === 'Static members' || propName === 'Non-Public members' || propName.startsWith('_') || propName === 'Raw View' || propName === 'Results View';
       if (isInternal) continue;
-      
+
       obj[propName] = buildObjectTree(child, depth + 1);
     }
   }
@@ -95,13 +95,10 @@ export function buildObjectTree(node: VariableNode, depth: number = 0): any {
 /**
  * Hàm định dạng cây biến thành chuỗi text (JSON hoặc Plain Text)
  */
-export function formatVariable(node: VariableNode, format: 'json' | 'plain' = 'json'): string {
+export function formatVariable(node: VariableNode, format: 'json' | 'plain' = 'json'): Record<string, string> {
   const hasChildren = node.children && node.children.length > 0;
-  
-  if (node.variablesReference === 0 && !hasChildren) {
-    return format === 'json' ? JSON.stringify(node.value) : String(node.value);
-  }
-
+  if (node.variablesReference === 0 && !hasChildren)
+    return format === 'json' ? { [node.name]: JSON.stringify(node.value) } : { [node.name]: String(node.value) }
   const obj = buildObjectTree(node);
-  return format === 'json' ? JSON.stringify(obj, null, 2) : String(obj);
+  return format === 'json' ? { [node.name]: JSON.stringify(obj, null, 2) } : { [node.name]: String(obj) }
 }

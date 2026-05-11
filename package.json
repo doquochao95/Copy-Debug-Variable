@@ -1,8 +1,8 @@
 {
   "name": "copy-debug-variable",
   "displayName": "Copy Debug Variable",
-  "description": "Copy variable values during debugging sessions with support for all data types",
-  "version": "1.0.0",
+  "description": "High-performance extension for copying and comparing debugger variables with Turbo Serialization.",
+  "version": "1.1.0",
   "icon": "extension_logo.png",
   "publisher": "doquochao95",
   "license": "MIT",
@@ -20,6 +20,7 @@
   "keywords": [
     "debug",
     "copy",
+    "compare",
     "json",
     "variable",
     ".net",
@@ -32,14 +33,36 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
-    "commands": [{
-      "command": "copyDebugVariable.copyValue",
-      "title": "Copy Variable Value"
-    }],
+    "commands": [
+      {
+        "command": "copyDebugVariable.copyValue",
+        "title": "Copy Variable Value"
+      },
+      {
+        "command": "copyDebugVariable.selectForCompare",
+        "title": "Select for Compare"
+      },
+      {
+        "command": "copyDebugVariable.compareWithSelected",
+        "title": "Compare with Selected"
+      }
+    ],
     "menus": {
-      "debug/variables/context": [{
-        "command": "copyDebugVariable.copyValue"
-      }]
+      "debug/variables/context": [
+        {
+          "command": "copyDebugVariable.copyValue",
+          "group": "1_modification"
+        },
+        {
+          "command": "copyDebugVariable.selectForCompare",
+          "group": "2_compare@1"
+        },
+        {
+          "command": "copyDebugVariable.compareWithSelected",
+          "group": "2_compare@2",
+          "when": "copyDebugVariable.hasSelectedForCompare"
+        }
+      ]
     },
     "configuration": {
       "title": "Copy Debug Variable",
